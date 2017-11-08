@@ -7,6 +7,8 @@ Search longest common substrings using generalized suffix trees built with Ukkon
 Author: Ilya Stepanov <code at ilyastepanov.com>
 
 (c) 2013
+
+Adapted by Luca Mondada to output all substring matches
 """
 
 
@@ -14,8 +16,10 @@ from __future__ import print_function
 import sys
 import re
 import argparse
+from itertools import repeat
 
-END_OF_STRING = sys.maxint
+# some crazy value = infinity
+END_OF_STRING = 10**10
 
 
 class SuffixTreeNode:
@@ -201,30 +205,36 @@ class SuffixTree:
             leaf.end = len(self.input_string)
         self.leaves.extend(new_leaves)
 
-    def find_longest_common_substrings(self):
+    def find_common_substrings(self):
         """
         Search longest common substrings in the tree by locating lowest common ancestors what belong to all strings
         """
 
+        # min length of common substrings
+        threshold = 2
+        
         # all bits are set
         success_bit_vector = 2 ** self.strings_count - 1
 
-        lowest_common_ancestors = []
+        lowest_common_ancestors = set()
 
         # going up to the root
         for leaf in self.leaves:
             node = leaf
             while node.parent is not None:
-                if node.bit_vector != success_bit_vector:
-                    # updating parent's bit vector
-                    node.parent.bit_vector |= node.bit_vector
-                    node = node.parent
-                else:
+                # updating parent's bit vector
+                node.parent.bit_vector |= node.bit_vector
+                if node.bit_vector == success_bit_vector:
+                    # we've been here already
+                    if node in lowest_common_ancestors:
+                        break
                     # hey, we've found a lowest common ancestor!
-                    lowest_common_ancestors.append(node)
-                    break
+                    lowest_common_ancestors.add(node)
+                node = node.parent
 
-        longest_common_substrings = ['']
+        common_substrings_set = set()
+        return_value = []
+        
         longest_length = 0
 
         # need to filter the result array and get the longest common strings
@@ -237,14 +247,16 @@ class SuffixTree:
                 node = node.parent
             # remove unique endings ($<number>), we don't need them anymore
             common_substring = re.sub(r'(.*?)\$?\d*$', r'\1', common_substring)
-            if len(common_substring) > longest_length:
-                longest_length = len(common_substring)
-                longest_common_substrings = [common_substring]
-            elif len(common_substring) == longest_length and common_substring not in longest_common_substrings:
-                longest_common_substrings.append(common_substring)
-
-        return longest_common_substrings
-
+            if len(common_substring) >= threshold:
+                if common_substring not in common_substrings_set:
+                    positions = self.find_leaves_in_subtree(common_ancestor)
+                    positions = _format_positions(positions, len(common_substring), self.get_string_lengths())
+                    
+                    common_substrings_set.add(common_substring)
+                    return_value.append((common_substring, positions))
+          
+        return return_value
+            
     def to_graphviz(self, node=None, output=''):
         """
         Show the tree as graphviz string. For debugging purposes only
@@ -275,7 +287,57 @@ class SuffixTree:
     def __str__(self):
         return self.to_graphviz()
 
+    def find_leaves_in_subtree(self, root):
+            """
+            Finds leaves in subtree of root
+            """
+            
+            # vals is a list of (substr identifiers, depth)
+            vals = []
+            
+            substr_len = self.input_string[root.start:root.end].find('$')
+            
+            # this node contains the end of the string (ie contains $)
+            if substr_len >= 0:
+                vals.extend(zip(_extract_identifiers(root.bit_vector), repeat(substr_len-1)))
+            else:
+                for k,child in root.edges.items():
+                    # get values for this child and increase depth by one: tple = (id, depth)
+                    new_vals = self.find_leaves_in_subtree(child)
+                    new_vals = map(lambda tple: (tple[0], tple[1]+1), new_vals)
+                    
+                    vals.extend(new_vals)
+            return vals
+    
+    def get_string_lengths(self):
+        l = self.input_string.split('$')
+        l = [s.strip('0123456789') for s in l]
+        return list(map(len, l))
 
+def _extract_identifiers(bit_vector):
+    ids = []
+    identifier = 0
+    while bit_vector > 0:
+        if bit_vector % 2 == 1:
+            ids.append(identifier)
+        bit_vector >>= 1
+        identifier += 1
+    return ids
+      
+def _format_positions(positions, matching_len, sizes):
+    """
+    Changes formatting from [(id,offset_from_last)] to {id:index_from_begin}
+    """
+    return_value = {}
+    for identifiers, from_last in positions:
+        index = sizes[identifiers] - from_last - matching_len
+        
+        try:
+            return_value[identifiers].append(index)
+        except KeyError:
+            return_value[identifiers] = [index]
+    return return_value
+    
 def main():
     parser = argparse.ArgumentParser(
         description='Searching longest common substring. '
