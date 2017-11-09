@@ -97,7 +97,7 @@ class SuffixTree:
         # the root node
         self.root = SuffixTreeNode()
 
-        # all strings are concatenaited together. Tree's nodes stores only indices
+        # all strings are concatenaited together. Tree's nodes store only indices
         self.input_string = ''
 
         # number of strings stored by this tree
@@ -105,8 +105,12 @@ class SuffixTree:
 
         # list of tree leaves
         self.leaves = []
+        
+        # each string belongs to a class
+        # we will find substrings that appear in each class at least once
+        self.classes = {}
 
-    def append_string(self, input_string):
+    def append_string(self, input_string, class_id = None):
         """
         Add new string to the suffix tree
         """
@@ -119,6 +123,14 @@ class SuffixTree:
         # gathering 'em all together
         self.input_string += input_string
         self.strings_count += 1
+        
+        # assigning string to a class
+        if class_id is None:
+            class_id = '$' + str(current_string_index)
+        try:
+            self.classes[class_id].append(current_string_index)
+        except KeyError:
+            self.classes[class_id] = [current_string_index]
 
         # these 3 variables represents current "active point"
         active_node = self.root
@@ -209,9 +221,6 @@ class SuffixTree:
         Search longest common substrings in the tree by locating lowest common ancestors what belong to all strings
         """
         
-        # all bits are set
-        success_bit_vector = 2 ** self.strings_count - 1
-
         lowest_common_ancestors = set()
 
         # going up to the root
@@ -225,7 +234,7 @@ class SuffixTree:
                 # propagating bit vector
                 node.bit_vector |= prev_bit_vector
                 
-                if node.bit_vector == success_bit_vector:
+                if self.is_successful(node.bit_vector):
                     # hey, we've found a lowest common ancestor!
                     lowest_common_ancestors.add(node)
                 prev_bit_vector = node.bit_vector
@@ -288,6 +297,18 @@ class SuffixTree:
 
         return output
 
+    def is_successful(self, bit_vector):
+        """
+        checks whether bit_vector contains a one bit in each string class
+        """
+        for cls in self.classes.values():
+            for representative in cls:
+                if (bit_vector >> representative) % 2 == 1:
+                    break
+            else:
+                return False
+        return True
+        
     def __str__(self):
         return self.to_graphviz()
 
