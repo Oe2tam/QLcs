@@ -221,15 +221,17 @@ class SuffixTree:
         # going up to the root
         for leaf in self.leaves:
             node = leaf
+            prev_bit_vector = 0
             while node.parent is not None:
-                # updating parent's bit vector
-                node.parent.bit_vector |= node.bit_vector
+                if (node.bit_vector & prev_bit_vector) == prev_bit_vector:
+                    # no point in propagating further - we've been here before
+                    break
+                # propagating bit vector
+                node.bit_vector |= prev_bit_vector
                 if node.bit_vector == success_bit_vector:
-                    # we've been here already
-                    if node in lowest_common_ancestors:
-                        break
                     # hey, we've found a lowest common ancestor!
                     lowest_common_ancestors.add(node)
+                previous_bit_vector = node.bit_vector
                 node = node.parent
 
         common_substrings_set = set()
