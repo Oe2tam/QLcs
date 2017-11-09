@@ -205,13 +205,10 @@ class SuffixTree:
             leaf.end = len(self.input_string)
         self.leaves.extend(new_leaves)
 
-    def find_common_substrings(self):
+    def find_common_substrings(self, min_substr_len=2):
         """
         Search longest common substrings in the tree by locating lowest common ancestors what belong to all strings
         """
-
-        # min length of common substrings
-        threshold = 2
         
         # all bits are set
         success_bit_vector = 2 ** self.strings_count - 1
@@ -250,7 +247,7 @@ class SuffixTree:
                 node = node.parent
             # remove unique endings ($<number>), we don't need them anymore
             common_substring = re.sub(r'(.*?)\$?\d*$', r'\1', common_substring)
-            if len(common_substring) >= threshold:
+            if len(common_substring) >= min_substr_len:
                 if common_substring not in common_substrings_set:
                     positions = self.find_leaves_in_subtree(common_ancestor)
                     print(positions)
