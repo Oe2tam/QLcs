@@ -12,7 +12,6 @@ Adapted by Luca Mondada to output all substring matches
 """
 
 
-from __future__ import print_function
 import sys
 import re
 import argparse
@@ -233,7 +232,7 @@ class SuffixTree:
                 node = node.parent
 
         common_substrings_set = set()
-        return_value = []
+        return_value = {}
         
         longest_length = 0
 
@@ -250,8 +249,7 @@ class SuffixTree:
             if len(common_substring) >= min_substr_len:
                 if common_substring not in common_substrings_set:
                     positions = self.find_leaves_in_subtree(common_ancestor)
-                    print(positions)
-                    positions = _format_positions(
+                    positions = self._format_positions(
                             positions,
                             common_ancestor.end-common_ancestor.start,
                             len(common_substring),
@@ -259,7 +257,7 @@ class SuffixTree:
                     )
                     
                     common_substrings_set.add(common_substring)
-                    return_value.append((common_substring, positions))
+                    return_value[common_substring] = positions
           
         return return_value
             
@@ -306,15 +304,11 @@ class SuffixTree:
             
             # this node contains the end of the string (ie contains $)
             if substr_len >= 0:
-                print(self.input_string[root.start:root.end])
                 vals.extend(zip(_extract_identifiers(root.bit_vector), repeat(substr_len)))
             else:
                 for k,child in root.edges.items():
                     # get values for this child and increase depth by one: tple = (id, depth)
-                    print('now is', self.input_string[root.start:root.end])
-                    print('going down', k)
                     new_vals = self.find_leaves_in_subtree(child)
-                    print('going up', k)
                     new_vals = map(lambda tple: (tple[0], tple[1]+root.end-root.start), new_vals)
                     
                     vals.extend(new_vals)
@@ -327,6 +321,16 @@ class SuffixTree:
         l = self.input_string.split('$')
         l = [s.strip('0123456789') for s in l]
         return list(map(len, l))
+        
+    def _format_positions(self, positions, node_substr_len, matching_len, sizes):
+        """
+        Changes formatting from [(id,offset_from_last)] to [id:index_from_begin]
+        """
+        return_value = [[] for i in range(self.strings_count)]
+        for identifiers, from_last in positions:
+            index = sizes[identifiers] - (from_last-node_substr_len) - matching_len
+            return_value[identifiers].append(index)
+        return return_value
 
 def _extract_identifiers(bit_vector):
     """
@@ -340,17 +344,3 @@ def _extract_identifiers(bit_vector):
         bit_vector >>= 1
         identifier += 1
     return ids
-      
-def _format_positions(positions, node_substr_len, matching_len, sizes):
-    """
-    Changes formatting from [(id,offset_from_last)] to {id:index_from_begin}
-    """
-    return_value = {}
-    for identifiers, from_last in positions:
-        index = sizes[identifiers] - (from_last-node_substr_len) - matching_len
-        
-        try:
-            return_value[identifiers].append(index)
-        except KeyError:
-            return_value[identifiers] = [index]
-    return return_value
