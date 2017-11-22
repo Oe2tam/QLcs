@@ -1,0 +1,1 @@
+from qlcs import SuffixTree
